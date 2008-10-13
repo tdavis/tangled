@@ -1,7 +1,7 @@
 import urlparse, logging, os
 
-from twisty.web.client.util import WWWInsensitiveDefaultDict
-from twisty.web.client.protocol import SimpleStringReader, SimpleStringWriter
+from tangled.web.client.util import WWWInsensitiveDefaultDict
+from tangled.web.client.protocol import SimpleStringReader, SimpleStringWriter
 
 from twisted.python.failure import Failure
 
