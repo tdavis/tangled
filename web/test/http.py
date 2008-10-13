@@ -1,5 +1,5 @@
 """
-Tests for L{twisting.web.client.http}.
+Tests for L{twisty.web.client.http}.
 
 
 import os
@@ -19,7 +19,7 @@ except:
 """
 
 from twisted.trial import unittest
-from twisting.web.client.http import Uri
+from twisty.web.client.http import Uri
 
 
 
