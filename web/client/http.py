@@ -38,8 +38,13 @@ class RedirectLimitExceededError(Exception):
 
 
 class PendingChannel(object):
+    """
+    A dummy `Pending Channel` which are used to make sure queuing is
+    done accurately.
+    """
     host = None
     readPersistent = PERSIST_NO_PIPELINE
+
 
 class Uri(object):
     def __init__(self, url):
@@ -530,6 +535,10 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         self.resetQueue()
     
     def runCount(self):
+        """
+        Gets the number of 'running' requests which pending requests are
+        considered to be as well.
+        """
         return len(self.openChannels.union(self.pendingChannels))
     
     def queueCount(self, host=None):
@@ -596,6 +605,16 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
             self.queue[host] = dq()
     
     def rotateQueue(self, host=None):
+        """
+        Queued requests can be 'forgotten' if requests for a host do not
+        finish properly. When this happens the queues need to be rotated
+        such that requests are forced into 'open' mode.
+        
+        @type host: c{str}
+        @param host: An optional host queue to rotate. If no host is
+            provided all queues are rotated.
+        
+        """
         def rotateThese(hosts):
             maxRunnable = self.maxConcurrent - self.runCount()
             if maxRunnable <= 0: return False
@@ -617,6 +636,18 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
             return rotateThese(self.queue.keys())
     
     def submitRequest(self, request, _deferFromRedirect=None, now=False):
+        """
+        Submits a request which may be run immediately or queued.
+        
+        @param request: The request
+        @type request: L{ClientRequest}
+        @param _deferFromRedirect: If this is supplied it means that a
+            redirect occurred and that deferred should be used for the
+            subsequent re-request.
+        @type _deferFromRedirect: C{Deferred}
+        @param now: Force the request to run NOW
+        @type now: C{bool}
+        """
         d = None
         if self.maxRedirects == 0:
             d = request.protocol.deferred
@@ -639,6 +670,12 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         return d
     
     def createClientChannel(self, request):
+        """
+        Creates the actual channel for the request.
+        
+        @param request: The request
+        @type request: L{ClientRequest}
+        """
         c = ClientCreator(reactor, self.clientChannel, self)
         d = c.connectTCP(host=request.uri.netloc, port=request.uri.port)
         pending = PendingChannel()
@@ -650,24 +687,28 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         d.addErrback(self.__handleConnErrback, request, pending)
         
     def __handleConnErrback(self, e, request, pending=None):
-        """docstring for __handleConnErrback"""
+        """
+        Handles any timeout or unexpected error during a request.
+        """
         if pending:
             self.pendingChannels.remove(pending)
         return self.agent.handleError(e, request, retry=True)
     
     def __handleErrback(self, e, d):
+        """
+        Handles all other errbacks.
+        """
         if d:
             d.errback(e)
         else:
             return self.agent.handleError(e)
     
     def __handlePossibleRedirect(self, response, d):
-        try:
-            request = response.request
-        except AttributeError:
-            # Occasionally, this will receive "None" for response; I have
-            # no idea how this is even possible, but if it happens...
-            d.errback(ProtocolError("Holy Shit!"))
+        """
+        The wonderful handling of possible redirects is done here, for lack
+        of a place that makes more sense to me.
+        """
+        request = response.request
             
         if response.code in (MOVED_PERMANENTLY,FOUND):
             # Only auto-handle redirect for GET and POST, per RFC 2616
@@ -707,7 +748,7 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         
     
     def clientPipelining(self, channel):
-        # Not implemented due to bug in twisted.web2
+        # Not implemented due to bug in twisted.web2 (I think!)
         pass
     
     def clientGone(self, channel):
@@ -778,6 +819,9 @@ class Agent(object, TimeoutMixin):
         return self.manager.submitRequest(request, now=now)
     
     def timeoutConnection(self):
+        """
+        From: C{TimeoutMixin}
+        """
         self.logger.info("Agent timed out.")
         self.manager.loseEverything(AgentTimeout())
         self.done.callback(None)
