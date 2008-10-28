@@ -1,0 +1,21 @@
+There are numerous outstanding issues with this implementation.
+
+- 	Persistent connections do not actually check to ensure that Keep-Alive is
+	sent back by the server meaning that web servers which don't actually
+	support it will cause errors from connections which believe they are still
+	open even though they're not.
+	
+-	Pipelining flat out doesn't work because of "too much recursion" exception
+	when sending many requests back-to-back.
+	
+-	The timeout handling could probably be improved.
+
+-	Redirect handling is done by juggling `Deferred`s which may be excessively
+	ugly.
+	
+-	Error handling could probably be done much more intelligently when it comes
+	to `Agent`.
+	
+More or less, this is a proof of concept that I just so happen to be using
+fairly successfully in a production environment, so long as persistence is
+avoided. I fully plan to improve on and fix the bugs in it once time allows.
