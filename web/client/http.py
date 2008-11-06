@@ -116,7 +116,7 @@ class Uri(object):
         loc = '?'.join((self.path,self.query))
         if loc.endswith('?'):
             loc = loc[:-1]
-        return loc
+        return loc.replace(' ', '%20')
     
     def join(self, uri):
         """
@@ -365,7 +365,11 @@ class HTTPClientChannelRequest(HTTPParser):
         else:            
             self.sendHeader('Connection', 'Keep-Alive')
             # l.append("%s: %s\r\n" % ('Connection', 'Keep-Alive'))
-            
+        
+        self.sendHeader('Accept','text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        self.sendHeader('Accept-charset', 'ISO-8859-1,utf-8;q=0.7,*;q=0.7')
+        self.sendHeader('Cache-Control', 'max-age=0')
+        
         self.transport.write("\r\n")
         request.protocol.makeConnection(self)
     
@@ -425,7 +429,6 @@ class HTTPClientChannelRequest(HTTPParser):
     
     def gotInitialLine(self, initialLine):
         parts = initialLine.split(' ', 2)
-        
         # Parse the initial request line
         if len(parts) != 3:
             self._abortWithError(BAD_REQUEST,
@@ -519,7 +522,7 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
     openChannels = set()
     pendingChannels = set()
     persistQueueThreshold = 5
-    clientIdleTimeout = 5
+    clientIdleTimeout = 25
     agent = None
     maxRedirects = 5
     stopping = False
@@ -742,10 +745,11 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
     
     def clientIdle(self, channel):
         channel.setTimeout(self.clientIdleTimeout)
-        d = self.queue[channel.host].get()
-        d.addCallback(self.__requestFromQueue, channel)
-        d.addErrback(self.__handleErrback, None)
+        # something messed below here...
         
+        #d = self.queue[channel.host].get()
+        #d.addCallback(self.__requestFromQueue, channel)
+        #d.addErrback(self.__handleErrback, None)
     
     def clientPipelining(self, channel):
         # Not implemented due to bug in twisted.web2 (I think!)
@@ -760,10 +764,10 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
             # rotate all queues to check for any dangling requests
             self.agent.connManagerIdle()
         del channel
-            
+    
     def loseClient(self, channel, reason):
         channel.connectionLost(reason)
-        
+    
     def loseEverything(self, reason):
         self.stopping = True
         self.resetQueue()
