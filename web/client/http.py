@@ -694,7 +694,7 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         Handles any timeout or unexpected error during a request.
         """
         if pending:
-            self.pendingChannels.remove(pending)
+            self.pendingChannels.discard(pending)
         return self.agent.handleError(e, request, retry=True)
     
     def __handleErrback(self, e, d):
