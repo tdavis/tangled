@@ -5,7 +5,7 @@ from tangled.web.client.protocol import SimpleStringReader, SimpleStringWriter
 
 from twisted.python.failure import Failure
 
-from twisted.internet import reactor
+from twisted.internet import reactor, ssl
 from twisted.internet.main import CONNECTION_DONE, CONNECTION_LOST
 from twisted.internet.protocol import ClientCreator
 from twisted.internet.defer import Deferred, DeferredQueue
@@ -75,7 +75,12 @@ class Uri(object):
         parts = self.getRawParts()
         self.scheme = parts.scheme or 'http'
         self.path = parts.path or '/'
-        self.port = parts.port or 80
+        self.port = parts.port
+        if not self.port:
+            if self.scheme == 'http':
+                self.port = 80
+            else:
+                self.port = 443
         self.netloc, self.query, self.fragment = parts.netloc, parts.query, parts.fragment
         self.hostname = self.netloc
     
@@ -680,7 +685,11 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         @type request: L{ClientRequest}
         """
         c = ClientCreator(reactor, self.clientChannel, self)
-        d = c.connectTCP(host=request.uri.netloc, port=request.uri.port)
+        if request.uri.scheme == 'http':
+            d = c.connectTCP(host=request.uri.netloc, port=request.uri.port)
+        else:
+            d = c.connectSSL(host=request.uri.netloc, port=request.uri.port,
+                contextFactory=ssl.ClientContextFactory())
         pending = PendingChannel()
         pending.host = request.uri.getHost()
         if request.closeAfter:
