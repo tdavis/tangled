@@ -765,7 +765,7 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         pass
     
     def clientGone(self, channel):
-        self.openChannels.remove(channel)
+        self.openChannels.discard(channel)
         # There may not be another channel waiting for requests from this
         # host, so rotate the queue to possibily initialize a new one
         if not self.stopping: self.rotateQueue(channel.host)
@@ -778,12 +778,16 @@ class HTTPClientChannelManager(EmptyHTTPClientManager):
         channel.connectionLost(reason)
     
     def loseEverything(self, reason):
-        self.stopping = True
-        self.resetQueue()
-        for chan in self.openChannels:
-            chan.connectionLost(reason)
-        self.pendingChannels = set()
-        self.openChannels = set()
+        if not self.stopping:
+            self.stopping = True
+            self.resetQueue()
+            # Here we copy the openChannels set in case one returns while we
+            # are iterating and changes the set size.
+            openChannels = self.openChannels.copy()
+            for chan in openChannels:
+                chan.connectionLost(reason)
+            self.pendingChannels = set()
+            self.openChannels = set()
     
 
 
@@ -796,6 +800,7 @@ class Agent(object, TimeoutMixin):
     
     closeAfter = False
     timeOut = 60 * 2
+    timedOut = False
     defaultReadProto = SimpleStringReader
     defaultWriteProto = SimpleStringWriter
     done = None
@@ -835,9 +840,11 @@ class Agent(object, TimeoutMixin):
         """
         From: C{TimeoutMixin}
         """
-        self.logger.info("Agent timed out.")
-        self.manager.loseEverything(AgentTimeout())
-        self.done.callback(None)
+        if not self.timedOut:
+            self.timedOut = True
+            self.logger.info("Agent timed out.")
+            self.manager.loseEverything(AgentTimeout())
+            self.done.callback(None)
     
     def stop(self):
         self.setTimeout(0)
